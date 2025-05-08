@@ -22,12 +22,14 @@ async function importCSV() {
 
   // Validazione input
   if (!apiKeyInput.value.trim()) {
-    output.textContent = "⚠️ Inserisci la tua API Key di Brevo."
+    output.innerHTML = '<span class="text-error">⚠️</span> Inserisci la tua API Key di Brevo.'
+    animateOutput()
     return
   }
 
   if (!fileInput.files.length) {
-    output.textContent = "⚠️ Seleziona un file CSV."
+    output.innerHTML = '<span class="text-error">⚠️</span> Seleziona un file CSV.'
+    animateOutput()
     return
   }
 
@@ -40,7 +42,10 @@ async function importCSV() {
 
   // Prepara l'interfaccia
   importButton.disabled = true
-  output.textContent = "📦 Elaborazione del file CSV...\n"
+  importButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importazione in corso...'
+  importButton.classList.add("disabled")
+
+  output.innerHTML = '<span class="text-info">📦</span> Elaborazione del file CSV...\n'
   progressContainer.classList.remove("hidden")
   statsContainer.classList.remove("hidden")
   createdListsContainer.classList.add("hidden")
@@ -56,16 +61,18 @@ async function importCSV() {
   // Ottieni tutte le liste esistenti
   let existingLists = []
   try {
-    output.textContent += "🔍 Recupero delle liste esistenti...\n"
+    output.innerHTML += '<span class="text-info">🔍</span> Recupero delle liste esistenti...\n'
     existingLists = await fetchExistingLists(apiKey)
-    output.textContent += `✅ Recuperate ${existingLists.length} liste esistenti.\n\n`
+    output.innerHTML += `<span class="text-success">✅</span> Recuperate <span class="text-highlight">${existingLists.length}</span> liste esistenti.\n\n`
+    animateOutput()
   } catch (error) {
-    output.textContent += `❌ Errore nel recupero delle liste: ${error.message}\n`
+    output.innerHTML += `<span class="text-error">❌</span> Errore nel recupero delle liste: ${error.message}\n`
     if (error.message.includes("unrecognised IP address")) {
       ipErrorDetected = true
       handleIpError(error.message, output, continueOnIpError)
     }
-    importButton.disabled = false
+    resetImportButton()
+    animateOutput()
     return
   }
 
@@ -78,13 +85,15 @@ async function importCSV() {
       const totalContacts = contacts.length
 
       if (totalContacts === 0) {
-        output.textContent = "⚠️ Il file CSV non contiene contatti validi."
-        importButton.disabled = false
+        output.innerHTML = '<span class="text-error">⚠️</span> Il file CSV non contiene contatti validi.'
+        resetImportButton()
+        animateOutput()
         return
       }
 
       totalCountEl.textContent = totalContacts
-      output.textContent += `📋 Trovati ${totalContacts} contatti nel file CSV.\n\n`
+      output.innerHTML += `<span class="text-info">📋</span> Trovati <span class="text-highlight">${totalContacts}</span> contatti nel file CSV.\n\n`
+      animateOutput()
 
       // Determina il formato del CSV
       const hasEmail = contacts[0].hasOwnProperty("email")
@@ -101,14 +110,17 @@ async function importCSV() {
         )
 
         if (possibleEmailColumns.length > 0) {
-          output.textContent += `ℹ️ Colonna email non trovata, ma utilizzerò "${possibleEmailColumns[0]}" come colonna email.\n\n`
+          output.innerHTML += `<span class="text-warning">ℹ️</span> Colonna email non trovata, ma utilizzerò "<span class="text-highlight">${possibleEmailColumns[0]}</span>" come colonna email.\n\n`
           // Rinomina la colonna in "email" per tutti i contatti
           contacts.forEach((contact) => {
             contact.email = contact[possibleEmailColumns[0]]
           })
+          animateOutput()
         } else {
-          output.textContent = "⚠️ Il file CSV non contiene una colonna email riconoscibile."
-          importButton.disabled = false
+          output.innerHTML =
+            '<span class="text-error">⚠️</span> Il file CSV non contiene una colonna email riconoscibile.'
+          resetImportButton()
+          animateOutput()
           return
         }
       }
@@ -119,7 +131,8 @@ async function importCSV() {
         contactGroups.push(contacts.slice(i, i + contactsPerList))
       }
 
-      output.textContent += `📊 I contatti saranno suddivisi in ${contactGroups.length} liste.\n\n`
+      output.innerHTML += `<span class="text-info">📊</span> I contatti saranno suddivisi in <span class="text-highlight">${contactGroups.length}</span> liste.\n\n`
+      animateOutput()
 
       // Crea le liste necessarie se non esistono
       const listIds = []
@@ -129,26 +142,31 @@ async function importCSV() {
 
         if (!listId && createListsIfNotExist) {
           try {
-            output.textContent += `🔨 Creazione della lista "${listName}"...\n`
+            output.innerHTML += `<span class="text-info">🔨</span> Creazione della lista "<span class="text-highlight">${listName}</span>"...\n`
+            animateOutput()
             listId = await createList(apiKey, listName)
             createdLists.push({ name: listName, id: listId })
-            output.textContent += `✅ Lista "${listName}" creata con ID: ${listId}\n`
+            output.innerHTML += `<span class="text-success">✅</span> Lista "<span class="text-highlight">${listName}</span>" creata con ID: <span class="text-highlight">${listId}</span>\n`
+            animateOutput()
           } catch (error) {
-            output.textContent += `❌ Errore nella creazione della lista "${listName}": ${error.message}\n`
+            output.innerHTML += `<span class="text-error">❌</span> Errore nella creazione della lista "<span class="text-highlight">${listName}</span>": ${error.message}\n`
             if (error.message.includes("unrecognised IP address")) {
               ipErrorDetected = true
               handleIpError(error.message, output, continueOnIpError)
               if (!continueOnIpError) {
-                importButton.disabled = false
+                resetImportButton()
+                animateOutput()
                 return
               }
             }
+            animateOutput()
           }
         } else if (!listId) {
-          output.textContent += `⚠️ La lista "${listName}" non esiste e la creazione automatica è disabilitata.\n`
+          output.innerHTML += `<span class="text-warning">⚠️</span> La lista "<span class="text-highlight">${listName}</span>" non esiste e la creazione automatica è disabilitata.\n`
           errori += contactGroups[i].length
           completati += contactGroups[i].length
           updateProgress(completati, totalContacts)
+          animateOutput()
           continue
         }
 
@@ -160,7 +178,14 @@ async function importCSV() {
         createdListsContainer.classList.remove("hidden")
         createdLists.forEach((list) => {
           const li = document.createElement("li")
-          li.textContent = `${list.name} (ID: ${list.id})`
+          li.className = "list-item"
+          li.innerHTML = `
+            <i class="fas fa-list-alt list-icon"></i>
+            <div class="list-content">
+              <div class="list-name">${list.name}</div>
+              <div class="list-id">ID: ${list.id}</div>
+            </div>
+          `
           createdListsList.appendChild(li)
         })
       }
@@ -174,7 +199,8 @@ async function importCSV() {
           continue // Salta questo gruppo se non abbiamo un ID lista valido
         }
 
-        output.textContent += `\n📤 Importazione di ${group.length} contatti nella lista "${listNamePrefix}${groupIndex + 1}" (ID: ${listId})...\n\n`
+        output.innerHTML += `\n<span class="text-info">📤</span> Importazione di <span class="text-highlight">${group.length}</span> contatti nella lista "<span class="text-highlight">${listNamePrefix}${groupIndex + 1}</span>" (ID: <span class="text-highlight">${listId}</span>)...\n\n`
+        animateOutput()
 
         // Processa ogni contatto nel gruppo
         for (let contactIndex = 0; contactIndex < group.length; contactIndex++) {
@@ -187,7 +213,8 @@ async function importCSV() {
             errori++
             completati++
             updateProgress(completati, totalContacts)
-            output.textContent += `❌ Contatto ${globalIndex + 1}: Email mancante\n`
+            output.innerHTML += `<span class="text-error">❌</span> Contatto ${globalIndex + 1}: Email mancante\n`
+            animateOutput()
             continue
           }
 
@@ -201,7 +228,8 @@ async function importCSV() {
             errori++
             completati++
             updateProgress(completati, totalContacts)
-            output.textContent += `❌ Email non valida: ${email}\n`
+            output.innerHTML += `<span class="text-error">❌</span> Email non valida: <span class="text-highlight">${email}</span>\n`
+            animateOutput()
             continue
           }
 
@@ -254,12 +282,14 @@ async function importCSV() {
               })
               .then(() => {
                 aggiunti++
-                output.textContent += `✅ Aggiunto: ${email} alla lista ${listNamePrefix}${groupIndex + 1}\n`
+                output.innerHTML += `<span class="text-success">✅</span> Aggiunto: <span class="text-highlight">${email}</span> alla lista ${listNamePrefix}${groupIndex + 1}\n`
+                animateOutput()
               })
               .catch((err) => {
                 errori++
                 const errorMsg = err.message || err
-                output.textContent += `❌ Errore con ${email}: ${errorMsg}\n`
+                output.innerHTML += `<span class="text-error">❌</span> Errore con <span class="text-highlight">${email}</span>: ${errorMsg}\n`
+                animateOutput()
 
                 // Rileva errori di IP non autorizzato
                 if (errorMsg.includes("unrecognised IP address")) {
@@ -274,11 +304,13 @@ async function importCSV() {
                 updateProgress(completati, totalContacts)
 
                 if (completati === totalContacts) {
-                  output.textContent += `\n🎯 Importazione completata!\n✅ Totale aggiunti: ${aggiunti}\n❌ Errori: ${errori}\n`
-                  importButton.disabled = false
+                  output.innerHTML += `\n<span class="text-success">🎯</span> Importazione completata!\n<span class="text-success">✅</span> Totale aggiunti: <span class="text-highlight">${aggiunti}</span>\n<span class="text-error">❌</span> Errori: <span class="text-highlight">${errori}</span>\n`
+                  resetImportButton()
+                  animateOutput()
 
                   if (ipErrorDetected) {
-                    output.textContent += `\n⚠️ Sono stati rilevati errori di IP non autorizzato. Assicurati di autorizzare il tuo IP in Brevo prima di riprovare.\n`
+                    output.innerHTML += `\n<span class="text-warning">⚠️</span> Sono stati rilevati errori di IP non autorizzato. Assicurati di autorizzare il tuo IP in Brevo prima di riprovare.\n`
+                    animateOutput()
                   }
                 }
               })
@@ -287,8 +319,9 @@ async function importCSV() {
       }
     },
     error: (error) => {
-      output.textContent = `⚠️ Errore durante la lettura del file CSV: ${error}`
-      importButton.disabled = false
+      output.innerHTML = `<span class="text-error">⚠️</span> Errore durante la lettura del file CSV: ${error}`
+      resetImportButton()
+      animateOutput()
     },
   })
 }
@@ -356,7 +389,8 @@ function cleanEmailAddress(email, output, index) {
   if (email.includes(" - ")) {
     const emails = email.split(" - ")
     email = emails[0].trim() // Prendi la prima email
-    output.textContent += `ℹ️ Email multipla trovata: "${originalEmail}". Utilizzo: "${email}"\n`
+    output.innerHTML += `<span class="text-warning">ℹ️</span> Email multipla trovata: "<span class="text-highlight">${originalEmail}</span>". Utilizzo: "<span class="text-highlight">${email}</span>"\n`
+    animateOutput()
   }
 
   // Correzione errori comuni
@@ -381,7 +415,8 @@ function cleanEmailAddress(email, output, index) {
 
   // Se l'email è stata modificata, registra il cambiamento
   if (email !== originalEmail) {
-    output.textContent += `🔧 Email corretta: "${originalEmail}" → "${email}"\n`
+    output.innerHTML += `<span class="text-info">🔧</span> Email corretta: "<span class="text-highlight">${originalEmail}</span>" → "<span class="text-success">${email}</span>"\n`
+    animateOutput()
   }
 
   return email
@@ -392,11 +427,13 @@ function handleIpError(errorMsg, output, continueOnIpError) {
   const ipMatch = errorMsg.match(/unrecognised IP address ([0-9.]+)/)
   const ipAddress = ipMatch ? ipMatch[1] : "sconosciuto"
 
-  output.textContent += `\n⚠️ ATTENZIONE: Brevo ha bloccato le richieste perché provengono da un IP non autorizzato (${ipAddress}).\n`
-  output.textContent += `Per risolvere questo problema, vai su https://app.brevo.com/security/authorised_ips e aggiungi questo IP alla lista degli IP autorizzati.\n\n`
+  output.innerHTML += `\n<span class="text-error">⚠️ ATTENZIONE:</span> Brevo ha bloccato le richieste perché provengono da un IP non autorizzato (<span class="text-highlight">${ipAddress}</span>).\n`
+  output.innerHTML += `Per risolvere questo problema, vai su <a href="https://app.brevo.com/security/authorised_ips" target="_blank" class="text-info">https://app.brevo.com/security/authorised_ips</a> e aggiungi questo IP alla lista degli IP autorizzati.\n\n`
+  animateOutput()
 
   if (!continueOnIpError) {
-    output.textContent += `L'importazione è stata interrotta. Seleziona l'opzione "Continua nonostante errori di IP non autorizzato" se vuoi continuare comunque.\n\n`
+    output.innerHTML += `<span class="text-error">⛔</span> L'importazione è stata interrotta. Seleziona l'opzione "Continua nonostante errori di IP non autorizzato" se vuoi continuare comunque.\n\n`
+    animateOutput()
   }
 }
 
@@ -418,3 +455,20 @@ function isValidEmail(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
 }
+
+// Funzione per ripristinare il pulsante di importazione
+function resetImportButton() {
+  const importButton = document.getElementById("importButton")
+  importButton.disabled = false
+  importButton.innerHTML = '<i class="fas fa-upload"></i> Importa Contatti'
+  importButton.classList.remove("disabled")
+}
+
+// Funzione per animare lo scorrimento dell'output
+function animateOutput() {
+  const output = document.getElementById("output")
+  output.scrollTop = output.scrollHeight
+}
+
+// Inizializza Papa
+const Papa = window.Papa
